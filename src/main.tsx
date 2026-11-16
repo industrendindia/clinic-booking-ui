@@ -51,6 +51,7 @@ export type User = {
   default_slot_minutes?: number;
   opens_at?: string;
   closes_at?: string;
+  menu_permissions?: string[];
 };
 type Appointment = {
   id: string;
@@ -92,6 +93,18 @@ const nav: [Nav, React.ElementType][] = [
   ["Success Stories", ClipboardCheck],
   ["Settings", Settings],
 ];
+const navMenuKey: Record<Nav, string> = {
+  Dashboard: "DASHBOARD",
+  "Manage Appointments": "MANAGE_APPOINTMENTS",
+  Customers: "CUSTOMERS",
+  Practitioners: "PRACTITIONERS",
+  Services: "SERVICES",
+  Rooms: "ROOMS",
+  Payments: "PAYMENTS",
+  Attendance: "ATTENDANCE",
+  "Success Stories": "CERTIFICATES",
+  Settings: "SETTINGS",
+};
 
 export async function api<T>(
   path: string,
@@ -123,8 +136,9 @@ const readFileBase64 = (file: File | null) =>
   });
 
 function App() {
-  const publicJoin = window.location.pathname.match(/^\/join\/([a-z0-9-]+)\/?$/);
-  if (publicJoin) return <PublicQueueJoin slug={publicJoin[1]} />;
+  const publicJoin = window.location.pathname.match(/^\/join\/([^/]+)\/?$/i);
+  if (publicJoin)
+    return <PublicQueueJoin slug={decodeURIComponent(publicJoin[1])} />;
   const [token, setToken] = useState(
     () => sessionStorage.getItem("clinic_token") || "",
   );
@@ -277,6 +291,11 @@ function ClinicPortal({
   const [drawer, setDrawer] = useState(false);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
+  const permissions = new Set(user.menu_permissions || []);
+  const visibleNav: [Nav, React.ElementType][] =
+    user.role === "OWNER"
+      ? nav
+      : nav.filter(([name]) => permissions.has(navMenuKey[name]));
   const refresh = () =>
     api<DashboardData>("/dashboard", {}, token)
       .then(setData)
@@ -307,23 +326,7 @@ function ClinicPortal({
           </button>
         </div>
         <nav>
-          {nav
-            .filter(
-              ([n]) =>
-                user.role === "OWNER" ||
-                (user.role === "RECEPTIONIST"
-                  ? n !== "Practitioners"
-                  : ![
-                      "Manage Appointments",
-                      "Customers",
-                      "Payments",
-                      "Attendance",
-                      "Settings",
-                      "Practitioners",
-                      "Success Stories",
-                    ].includes(n)),
-            )
-            .map(([n, I]) => (
+          {visibleNav.map(([n, I]) => (
               <button
                 className={n === active ? "active" : ""}
                 onClick={() => {
@@ -398,7 +401,7 @@ function ClinicPortal({
         <Plus />
       </button>
       <div className="mobileNav">
-        {nav.slice(0, 4).map(([n, I]) => (
+        {visibleNav.slice(0, 4).map(([n, I]) => (
           <button
             key={n}
             className={active === n ? "active" : ""}
@@ -778,6 +781,7 @@ function ClinicSearch({ token }: { token: string }) {
     [totalPages, setTotalPages] = useState(0),
     [totalElements, setTotalElements] = useState(0);
   const [selected, setSelected] = useState<Record<string, any> | null>(null);
+  const [menuConfig, setMenuConfig] = useState<Record<string, any>[]>([]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       api<{
@@ -801,9 +805,16 @@ function ClinicSearch({ token }: { token: string }) {
   async function choose(id: string) {
     setError("");
     try {
-      setSelected(
-        await api<Record<string, any>>(`/admin/clinics/${id}`, {}, token),
-      );
+      const [clinic, menus] = await Promise.all([
+        api<Record<string, any>>(`/admin/clinics/${id}`, {}, token),
+        api<Record<string, any>[]>(
+          `/admin/clinics/${id}/menu-configuration`,
+          {},
+          token,
+        ),
+      ]);
+      setSelected(clinic);
+      setMenuConfig(menus);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -825,6 +836,7 @@ function ClinicSearch({ token }: { token: string }) {
             ownerPhone: String(f.get("ownerPhone")),
             whatsappPhone: String(f.get("whatsappPhone")),
             email: String(f.get("email")),
+            theme: String(f.get("theme")),
             opensAt: String(f.get("opensAt")),
             closesAt: String(f.get("closesAt")),
             slotMinutes: Number(f.get("slotMinutes")),
@@ -835,6 +847,19 @@ function ClinicSearch({ token }: { token: string }) {
             logoOriginalName: logo?.name || null,
           }),
         },
+        token,
+      );
+      const permissions = ["RECEPTIONIST", "PRACTITIONER"].flatMap(
+        (role) =>
+          Object.entries(navMenuKey).map(([label, menuKey]) => ({
+            role,
+            menuKey,
+            enabled: f.get(`menu_${role}_${menuKey}`) === "on",
+          })),
+      );
+      await api(
+        `/admin/clinics/${selected.id}/menu-configuration`,
+        { method: "PUT", body: JSON.stringify(permissions) },
         token,
       );
       setOk("Clinic details saved.");
@@ -916,7 +941,7 @@ function ClinicSearch({ token }: { token: string }) {
         </button>
       </div>
       {selected && (
-        <form className="onboardForm clinicEdit" onSubmit={save}>
+        <form key={selected.id} className="onboardForm clinicEdit" onSubmit={save}>
           <h3 className="wide">
             <Building2 />
             Edit clinic
@@ -955,6 +980,22 @@ function ClinicSearch({ token }: { token: string }) {
           <label>
             Slug
             <input value={selected.slug} disabled />
+          </label>
+          <label>
+            Clinic theme
+            <select name="theme" defaultValue={selected.theme || "terracotta"}>
+              {[
+                "terracotta",
+                "sage",
+                "sunset",
+                "rose",
+                "sand",
+                "plum",
+                "ocean",
+                "marigold",
+                "lavender",
+              ].map((theme) => <option key={theme} value={theme}>{theme}</option>)}
+            </select>
           </label>
           <label>
             Branch name
@@ -1040,6 +1081,29 @@ function ClinicSearch({ token }: { token: string }) {
             />
             Clinic active
           </label>
+          <section className="wide menuConfiguration">
+            <h3>Role menu visibility</h3>
+            <p>Unchecked menu items are removed from that role's desktop and WebView navigation.</p>
+            <div>
+              {["RECEPTIONIST", "PRACTITIONER"].map((role) => (
+                <fieldset key={role}>
+                  <legend>{role === "PRACTITIONER" ? "Doctor" : "Receptionist"}</legend>
+                  {Object.entries(navMenuKey).map(([label, menuKey]) => (
+                    <label className="checkField" key={`${role}-${menuKey}`}>
+                      <input
+                        name={`menu_${role}_${menuKey}`}
+                        type="checkbox"
+                        defaultChecked={menuConfig.some(
+                          (item) => item.role === role && item.menu_key === menuKey && item.enabled,
+                        )}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </fieldset>
+              ))}
+            </div>
+          </section>
           <div className="wide formActions">
             <button className="primary">Save clinic changes</button>
           </div>
