@@ -151,13 +151,21 @@ function App() {
       setUser(null);
       return;
     }
-    api<User>("/me", {}, token)
-      .then(setUser)
-      .catch(() => {
-        sessionStorage.removeItem("clinic_token");
-        setToken("");
-      })
-      .finally(() => setLoading(false));
+    const refreshUser = () =>
+      api<User>("/me", {}, token)
+        .then(setUser)
+        .catch(() => {
+          sessionStorage.removeItem("clinic_token");
+          setToken("");
+        })
+        .finally(() => setLoading(false));
+    refreshUser();
+    const timer = window.setInterval(refreshUser, 30000);
+    window.addEventListener("focus", refreshUser);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshUser);
+    };
   }, [token]);
   const login = (value: string) => {
     sessionStorage.setItem("clinic_token", value);
