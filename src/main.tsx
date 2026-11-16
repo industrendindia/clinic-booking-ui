@@ -724,8 +724,12 @@ function AdminPortal({
             <input name="ownerName" required />
           </label>
           <label>
-            Owner login email
-            <input name="ownerUsername" type="email" required />
+            Owner username
+            <input name="ownerUsername" pattern="[A-Za-z0-9._-]{3,60}" required placeholder="clinicowner" />
+          </label>
+          <label>
+            Owner email
+            <input name="ownerEmail" type="email" placeholder="owner@example.com" />
           </label>
           <label>
             Owner phone
@@ -891,6 +895,7 @@ function ClinicSearch({ token }: { token: string }) {
           body: JSON.stringify({
             displayName: String(f.get("doctorDisplayName")),
             username: String(f.get("doctorUsername")),
+            email: String(f.get("doctorEmail") || ""),
             password: String(f.get("doctorPassword")),
             phone: String(f.get("doctorPhone") || ""),
             joinedOn: String(f.get("doctorJoinedOn") || "") || null,
@@ -1159,8 +1164,12 @@ function ClinicSearch({ token }: { token: string }) {
             <input name="doctorDisplayName" required placeholder="Dr Ananya Sharma" />
           </label>
           <label>
-            Login email
-            <input name="doctorUsername" type="email" required placeholder="doctor@clinic.com" />
+            Username
+            <input name="doctorUsername" pattern="[A-Za-z0-9._-]{3,60}" required placeholder="dr.ananya" />
+          </label>
+          <label>
+            Email
+            <input name="doctorEmail" type="email" placeholder="shared@clinic.com" />
           </label>
           <label>
             Temporary password

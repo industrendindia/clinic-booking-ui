@@ -742,6 +742,7 @@ function Partners({ token, owner }: { token: string; owner: boolean }) {
           method: "POST",
           body: JSON.stringify({
             username: field(f, "username") || null,
+            email: field(f, "email") || null,
             password: field(f, "password") || null,
             displayName: field(f, "displayName"),
             phone: field(f, "phone"),
@@ -785,6 +786,7 @@ function Partners({ token, owner }: { token: string; owner: boolean }) {
           body: JSON.stringify({
             displayName: field(f, "displayName"),
             username: field(f, "username"),
+            email: field(f, "email") || null,
             password: field(f, "password"),
             phone: field(f, "phone"),
             joinedOn: field(f, "joinedOn") || null,
@@ -852,12 +854,16 @@ function Partners({ token, owner }: { token: string; owner: boolean }) {
               <input name="displayName" required />
             </label>
             <label>
-              Login email
+              Username
               <input
                 name="username"
-                type="email"
+                pattern="[A-Za-z0-9._-]{3,60}"
                 placeholder="Optional when no login is created"
               />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" placeholder="shared@clinic.com" />
             </label>
             <label>
               Temporary password
@@ -971,8 +977,12 @@ function Partners({ token, owner }: { token: string; owner: boolean }) {
               <input name="displayName" required />
             </label>
             <label>
-              Login email
-              <input name="username" type="email" required />
+              Username
+              <input name="username" pattern="[A-Za-z0-9._-]{3,60}" required />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" placeholder="shared@clinic.com" />
             </label>
             <label>
               Temporary password
