@@ -876,6 +876,37 @@ function ClinicSearch({ token }: { token: string }) {
       setError((x as Error).message);
     }
   }
+  async function onboardDoctor(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selected) return;
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    setError("");
+    setOk("");
+    try {
+      await api(
+        `/admin/clinics/${selected.id}/doctors`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            displayName: String(f.get("doctorDisplayName")),
+            username: String(f.get("doctorUsername")),
+            password: String(f.get("doctorPassword")),
+            phone: String(f.get("doctorPhone") || ""),
+            joinedOn: String(f.get("doctorJoinedOn") || "") || null,
+            engagement: String(f.get("doctorEngagement") || "FULL_TIME"),
+            yearsExperience: Number(f.get("doctorExperience") || 0),
+          }),
+        },
+        token,
+      );
+      form.reset();
+      setOk(`Doctor account created for ${selected.clinic_name}.`);
+      await choose(String(selected.id));
+    } catch (x) {
+      setError((x as Error).message);
+    }
+  }
   const joinUrl = selected
     ? `${window.location.origin}/join/${selected.slug}`
     : "";
@@ -949,6 +980,7 @@ function ClinicSearch({ token }: { token: string }) {
         </button>
       </div>
       {selected && (
+        <>
         <form key={selected.id} className="onboardForm clinicEdit" onSubmit={save}>
           <h3 className="wide">
             <Building2 />
@@ -1116,6 +1148,49 @@ function ClinicSearch({ token }: { token: string }) {
             <button className="primary">Save clinic changes</button>
           </div>
         </form>
+        <form className="onboardForm clinicEdit doctorOnboarding" onSubmit={onboardDoctor}>
+          <h3 className="wide">
+            <Stethoscope />
+            Onboard doctor
+          </h3>
+          <p className="wide">Create a doctor login for {selected.clinic_name}. Doctor menu visibility configured above will apply to this account.</p>
+          <label>
+            Doctor name
+            <input name="doctorDisplayName" required placeholder="Dr Ananya Sharma" />
+          </label>
+          <label>
+            Login email
+            <input name="doctorUsername" type="email" required placeholder="doctor@clinic.com" />
+          </label>
+          <label>
+            Temporary password
+            <input name="doctorPassword" type="password" minLength={12} maxLength={128} required autoComplete="new-password" />
+          </label>
+          <label>
+            Mobile number
+            <input name="doctorPhone" inputMode="tel" placeholder="9876543210" />
+          </label>
+          <label>
+            Joining date
+            <input name="doctorJoinedOn" type="date" />
+          </label>
+          <label>
+            Engagement
+            <select name="doctorEngagement" defaultValue="FULL_TIME">
+              <option value="FULL_TIME">Full time</option>
+              <option value="PART_TIME">Part time</option>
+              <option value="VISITING">Visiting</option>
+            </select>
+          </label>
+          <label>
+            Years of experience
+            <input name="doctorExperience" type="number" min="0" max="80" step="0.5" defaultValue="0" />
+          </label>
+          <div className="wide formActions">
+            <button className="primary"><UserRoundPlus size={16} /> Create doctor account</button>
+          </div>
+        </form>
+        </>
       )}
     </section>
   );
